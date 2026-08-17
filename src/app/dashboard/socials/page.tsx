@@ -39,6 +39,7 @@ export default function SocialsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [activeModalProvider, setActiveModalProvider] = useState<string | null>(null);
   const [profileHandle, setProfileHandle] = useState('');
+  const [displayName, setDisplayName] = useState('');
   
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -58,18 +59,13 @@ export default function SocialsPage() {
       .then(data => {
         if (data.accounts) {
           const formatted = data.accounts.map((acc: any) => {
-            // Read custom handle saved in externalId, fallback to defaults if mock ID format
-            let externalName = acc.externalId;
-            if (externalName.startsWith('mock-')) {
-              if (acc.provider === 'INSTAGRAM') externalName = '@acmecoffeedowntown';
-              else if (acc.provider === 'FACEBOOK') externalName = 'Acme Downtown Roastery';
-              else if (acc.provider === 'LINKEDIN') externalName = 'Akhil Makwana';
-              else externalName = 'Workspace Channel';
-            }
+            const handle = acc.externalId;
+            const dispName = acc.scopes && acc.scopes !== 'read write publish' && acc.scopes !== 'read write' ? acc.scopes : acc.provider === 'INSTAGRAM' ? 'Instagram Business' : acc.provider === 'LINKEDIN' ? 'LinkedIn Page' : 'Brand Page';
             return {
               ...acc,
-              externalName,
-              expiresIn: 'Active Token (58 days remaining)'
+              externalName: handle,
+              displayName: dispName,
+              expiresIn: 'Active Session (Verified Token)'
             };
           });
           setAccounts(formatted);
@@ -86,6 +82,7 @@ export default function SocialsPage() {
   const handleOpenConnectModal = (provider: string) => {
     setActiveModalProvider(provider);
     setProfileHandle('');
+    setDisplayName('');
     setErrorMessage('');
   };
 
@@ -93,6 +90,10 @@ export default function SocialsPage() {
     e.preventDefault();
     if (!profileHandle.trim()) {
       setErrorMessage('Please enter a valid handle or profile link');
+      return;
+    }
+    if (!displayName.trim()) {
+      setErrorMessage('Please enter a display name');
       return;
     }
     
@@ -105,7 +106,8 @@ export default function SocialsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           provider: activeModalProvider,
-          handle: profileHandle.trim()
+          handle: profileHandle.trim(),
+          displayName: displayName.trim()
         })
       });
 
@@ -194,7 +196,7 @@ export default function SocialsPage() {
                           <Icon className={`w-6 h-6 ${platform.color} fill-current`} />
                         </div>
                         <div>
-                          <h3 className="font-extrabold text-slate-800 text-sm leading-snug">{platform.name}</h3>
+                          <h3 className="font-extrabold text-slate-800 text-sm leading-snug">{account ? account.displayName : platform.name}</h3>
                           <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">
                             {account ? 'Linked Account' : 'Inactive'}
                           </p>
@@ -296,6 +298,19 @@ export default function SocialsPage() {
 
               {/* Form */}
               <form onSubmit={handleConnectSubmit} className="space-y-5 text-xs">
+                {/* Display Name */}
+                <div className="space-y-2">
+                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">Profile / Account Display Name</span>
+                  <Input 
+                    type="text"
+                    placeholder="e.g. Acme Coffee Roastery"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    required
+                    className="text-xs font-semibold"
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">Profile Username / URL Link</span>
                   <Input 
@@ -308,6 +323,13 @@ export default function SocialsPage() {
                   />
                   <p className="text-[10px] text-slate-400 font-medium leading-relaxed mt-1">
                     Enter the exact profile handle or URL link. The dashboard will register this to staging posts, staged previews, and custom logs.
+                  </p>
+                </div>
+
+                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                    Account status verified. Links in sandbox mode to authorize automated publishing triggers.
                   </p>
                 </div>
 

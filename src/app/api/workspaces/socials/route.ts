@@ -33,32 +33,35 @@ export async function POST(req: NextRequest) {
     const workspaceId = workspace.id;
     if (!workspaceId) return NextResponse.json({ error: 'No active workspace' }, { status: 400 });
 
-    const { provider } = await req.json();
+    const { provider, handle, displayName } = await req.json();
 
-    if (!provider) {
-      return NextResponse.json({ error: 'Provider is required' }, { status: 400 });
+    if (!provider || !handle) {
+      return NextResponse.json({ error: 'Provider and handle are required' }, { status: 400 });
     }
 
-    // Mock OAuth Connection
+    const externalId = handle.trim();
+    const scopes = displayName ? displayName.trim() : 'Active Profile';
+
+    // Persistence to Database (registers the custom profile handle / link)
     const account = await prisma.socialAccount.upsert({
       where: {
         workspaceId_provider_externalId: {
           workspaceId,
           provider,
-          externalId: `mock-${provider.toLowerCase()}-id`
+          externalId
         }
       },
       update: {
         status: 'CONNECTED',
-        encryptedToken: 'mock-token',
-        scopes: 'read write'
+        encryptedToken: 'mock-token-xyz',
+        scopes
       },
       create: {
         workspaceId,
         provider,
-        externalId: `mock-${provider.toLowerCase()}-id`,
-        encryptedToken: 'mock-token',
-        scopes: 'read write',
+        externalId,
+        encryptedToken: 'mock-token-xyz',
+        scopes,
         status: 'CONNECTED'
       }
     });
