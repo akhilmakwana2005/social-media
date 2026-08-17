@@ -1,0 +1,234 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String       @id @default(uuid())
+  name         String
+  email        String       @unique
+  passwordHash String
+  status       String       @default("ACTIVE") // ACTIVE, SUSPENDED, PENDING
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  memberships  Membership[]
+  workspaces   Workspace[]  @relation("WorkspaceOwner")
+  auditLogs    AuditLog[]   @relation("UserAudits")
+}
+
+model Workspace {
+  id              String           @id @default(uuid())
+  name            String
+  ownerId         String
+  owner           User             @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  planId          String           @default("FREE")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  memberships     Membership[]
+  businessProfile BusinessProfile?
+  brandKit        BrandKit?
+  socialAccounts  SocialAccount[]
+  contents        Content[]
+  mediaAssets     MediaAsset[]
+  automationRules AutomationRule[]
+  aiJobs          AIJob[]
+  subscription    Subscription?
+  usageRecords    UsageRecord[]
+}
+
+model Membership {
+  id          String    @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        String    @default("VIEWER") // OWNER, MANAGER, EDITOR, APPROVER, VIEWER
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([workspaceId, userId])
+}
+
+model BusinessProfile {
+  id          String    @id @default(uuid())
+  workspaceId String    @unique
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  industry    String
+  location    String
+  services    String // Stored as comma-separated or text description
+  audience    String
+  goals       String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model BrandKit {
+  id          String    @id @default(uuid())
+  workspaceId String    @unique
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  logoUrl     String?
+  colors      String // Stored as JSON or comma-separated hex strings
+  tone        String
+  cta         String?
+  restrictions String?  // Prohibited topics / brand restrictions
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model SocialAccount {
+  id             String    @id @default(uuid())
+  workspaceId    String
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  provider       String    // LINKEDIN, INSTAGRAM, FACEBOOK, TIKTOK, YOUTUBE
+  externalId     String    // Social platform ID
+  encryptedToken String    // Encrypted token at rest
+  scopes         String    // JSON or space-separated list of scopes
+  status         String    @default("CONNECTED") // CONNECTED, EXPIRED, REVOKED
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([workspaceId, provider, externalId])
+}
+
+model Content {
+  id          String           @id @default(uuid())
+  workspaceId String
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type        String           @default("POST") // POST, REEL, ARTICLE
+  status      String           @default("DRAFT") // DRAFT, GENERATING, REVIEW, APPROVED, SCHEDULED, PUBLISHING, PUBLISHED, FAILED, ARCHIVED
+  goal        String?
+  pillar      String?
+  sourceId    String?          // References raw repurpose source if any
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  variants    ContentVariant[]
+}
+
+model ContentVariant {
+  id        String     @id @default(uuid())
+  contentId String
+  content   Content    @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  platform  String     // LINKEDIN, INSTAGRAM, FACEBOOK, etc.
+  text      String
+  mediaId   String?
+  media     MediaAsset? @relation(fields: [mediaId], references: [id], onDelete: SetNull)
+  schedules Schedule[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model MediaAsset {
+  id          String           @id @default(uuid())
+  workspaceId String
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  storageKey  String
+  mimeType    String
+  size        Int
+  metadata    String?          // JSON metadata (dimensions, duration, etc.)
+  variants    ContentVariant[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Schedule {
+  id          String       @id @default(uuid())
+  variantId   String
+  variant     ContentVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  scheduledAt DateTime
+  timezone    String
+  status      String       @default("PENDING") // PENDING, PROCESSING, SUCCESS, FAILED
+  publication Publication?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Publication {
+  id             String             @id @default(uuid())
+  scheduleId     String             @unique
+  schedule       Schedule           @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  externalPostId String?            // Post ID on the social platform
+  publishedAt    DateTime           @default(now())
+  errorCode      String?            // Error code if published failed
+  errorMessage   String?
+  analytics      AnalyticsSnapshot?
+}
+
+model AnalyticsSnapshot {
+  id            String      @id @default(uuid())
+  publicationId String      @unique
+  publication   Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  impressions   Int         @default(0)
+  reach         Int         @default(0)
+  likes         Int         @default(0)
+  comments      Int         @default(0)
+  shares        Int         @default(0)
+  clicks        Int         @default(0)
+  updatedAt     DateTime    @updatedAt
+}
+
+model AutomationRule {
+  id          String    @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  mode        String    @default("APPROVAL_REQUIRED") // AUTO_PUBLISH, APPROVAL_REQUIRED
+  platforms   String    // Comma-separated list of platforms
+  frequency   Int       // Posts per week
+  windows     String    // JSON list of publishing windows
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model AIJob {
+  id          String    @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type        String    // STRATEGY_GEN, POST_GEN, CREATIVE_GEN, REPURPOSE
+  status      String    @default("PENDING") // PENDING, PROCESSING, SUCCESS, FAILED
+  provider    String    // OPENAI, GEMINI, ANTHROPIC, etc.
+  inputRef    String?   // Input prompt or source description
+  outputRef   String?   // JSON response or file URL
+  cost        Float     @default(0.0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Subscription {
+  id                 String    @id @default(uuid())
+  workspaceId        String    @unique
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  providerCustomerId String
+  plan               String    @default("FREE") // FREE, GROWTH, AGENCY
+  status             String    @default("ACTIVE") // ACTIVE, CANCELED, PAST_DUE
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model UsageRecord {
+  id          String    @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  metric      String    // AI_POST_GEN, AI_IMAGE_GEN, POSTS_PUBLISHED
+  quantity    Int       @default(0)
+  period      String    // YYYY-MM
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String
+  actor      User     @relation("UserAudits", fields: [actorId], references: [id], onDelete: Cascade)
+  action     String   // PUBLISH, DISCONNECT, PERMISSION_CHANGE, BILLING
+  objectType String   // e.g. WORKSPACE, SCHEDULE, ACCOUNT
+  objectId   String
+  metadata   String?  // JSON context
+  createdAt  DateTime @default(now())
+}
