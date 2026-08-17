@@ -8,9 +8,6 @@ const nextConfig: NextConfig = {
   experimental: {
     cpus: 1,
   },
-  turbopack: {
-    root: 'c:/Users/InteL/Desktop/social-media',
-  },
 };
 
 export default nextConfig;
