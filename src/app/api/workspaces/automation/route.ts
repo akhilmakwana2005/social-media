@@ -17,49 +17,11 @@ export async function GET(req: NextRequest) {
     });
 
     // Retrieve audit logs from the database
-    let auditLogs = await prisma.auditLog.findMany({
+    const auditLogs = await prisma.auditLog.findMany({
       where: { actorId: session.id },
       orderBy: { createdAt: 'desc' },
       take: 10
     });
-
-    // If database is empty, seed 3 initial realistic audit logs so they persist
-    if (auditLogs.length === 0) {
-      await prisma.auditLog.createMany({
-        data: [
-          {
-            actorId: session.id,
-            action: 'CONNECT',
-            objectType: 'ACCOUNT',
-            objectId: 'linkedin-oauth',
-            metadata: JSON.stringify({ name: 'LinkedIn Account successfully connected via OAuth' }),
-            createdAt: new Date(Date.now() - 3600000 * 24) // 1 day ago
-          },
-          {
-            actorId: session.id,
-            action: 'SAVE_RULES',
-            objectType: 'AUTOMATION_RULE',
-            objectId: workspaceId,
-            metadata: JSON.stringify({ mode: 'APPROVAL_REQUIRED', frequency: 3 }),
-            createdAt: new Date(Date.now() - 3600000 * 4) // 4 hours ago
-          },
-          {
-            actorId: session.id,
-            action: 'STAGED_DRAFT',
-            objectType: 'SCHEDULE',
-            objectId: workspaceId,
-            metadata: JSON.stringify({ name: 'Staged LinkedIn draft topic: "3 coffee bean sourcing tips"' }),
-            createdAt: new Date(Date.now() - 3600000 * 2) // 2 hours ago
-          }
-        ]
-      });
-
-      auditLogs = await prisma.auditLog.findMany({
-        where: { actorId: session.id },
-        orderBy: { createdAt: 'desc' },
-        take: 10
-      });
-    }
 
     // Format logs for UI Consumption
     const logs = auditLogs.map(log => {
