@@ -28,6 +28,7 @@ export default function CreateContentPage() {
   const [generating, setGenerating] = useState(false);
   const [generatedText, setGeneratedText] = useState('');
   const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -83,6 +84,34 @@ export default function CreateContentPage() {
       setError(err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePublishNow = async () => {
+    if (!generatedText) return;
+    setPublishing(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const res = await fetch('/api/content/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform,
+          text: generatedText,
+          pillar: topic,
+          goal: goal || 'Content Marketing'
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to publish content.');
+
+      setSuccess(`Post successfully published to ${platform}! Analytics metrics and activity logs have been updated.`);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setPublishing(false);
     }
   };
 
@@ -247,11 +276,20 @@ export default function CreateContentPage() {
                   <Button 
                     variant="outline" 
                     onClick={handleSaveDraft}
-                    disabled={!generatedText || saving || generating}
+                    disabled={!generatedText || saving || publishing || generating}
                     className="gap-2 bg-white"
                   >
                     {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     <span>Save Draft to Queue</span>
+                  </Button>
+                  <Button 
+                    variant="primary" 
+                    onClick={handlePublishNow}
+                    disabled={!generatedText || publishing || saving || generating}
+                    className="gap-2 bg-gradient-to-r from-brand-indigo to-brand-purple text-white border-0 shadow-lg cursor-pointer"
+                  >
+                    {publishing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    <span>Publish Now</span>
                   </Button>
                 </div>
               </div>
