@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getActiveWorkspace, getSession } from '@/lib/session';
-import { promises as fs } from 'fs';
-import path from 'path';
 
 export async function GET(req: NextRequest) {
   try {
@@ -43,24 +41,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // Mock upload by saving to public/uploads directory
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-    
-    // Ensure directory exists
-    try {
-      await fs.access(uploadDir);
-    } catch {
-      await fs.mkdir(uploadDir, { recursive: true });
-    }
-
-    const uniqueFilename = `${Date.now()}-${file.name}`;
-    const filePath = path.join(uploadDir, uniqueFilename);
+    // Convert file directly to Base64 to bypass Vercel serverless read-only file system restriction
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    
-    await fs.writeFile(filePath, buffer);
-
-    const storageKey = `/uploads/${uniqueFilename}`;
+    const base64Data = buffer.toString('base64');
+    const storageKey = `data:${file.type};base64,${base64Data}`;
 
     const media = await prisma.mediaAsset.create({
       data: {
@@ -93,13 +78,6 @@ export async function DELETE(req: NextRequest) {
     const asset = await prisma.mediaAsset.findUnique({ where: { id } });
     if (!asset || asset.workspaceId !== workspaceId) {
       return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
-    }
-
-    try {
-      const filePath = path.join(process.cwd(), 'public', asset.storageKey);
-      await fs.unlink(filePath);
-    } catch (err) {
-      console.warn('File deletion failed or did not exist:', err);
     }
 
     await prisma.mediaAsset.delete({ where: { id } });
